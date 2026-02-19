@@ -128,8 +128,12 @@ class Engine {
       ytdlpBin: this.config.ytdlpBin,
     });
 
-    await this.mpv.waitForSocketReady();
-    await this.reload("startup");
+    try {
+      await this.mpv.waitForSocketReady();
+      await this.reload("startup");
+    } catch (error) {
+      await this.handleFailure("startup_failed", error);
+    }
 
     this.pollTimer = setInterval(() => {
       void this.poll();
@@ -198,7 +202,6 @@ class Engine {
       });
     } catch (error) {
       await this.handleFailure("reload_failed", error);
-      throw toError(error);
     }
   }
 
