@@ -7,9 +7,12 @@ Wants=network-online.target
 Type=simple
 User=pi
 EnvironmentFile=-/etc/default/tune-in-music-mpv
+ExecStartPre=+/usr/bin/chvt 1
 ExecStart=/bin/sh -c 'exec mpv \
   --idle=yes \
   --fullscreen \
+  --vo=gpu \
+  --gpu-context=drm \
   --input-ipc-server=/tmp/mpv.sock \
   --cache=yes --cache-secs=30 \
   --demuxer-max-bytes=400M \
@@ -21,6 +24,11 @@ ExecStart=/bin/sh -c 'exec mpv \
   --really-quiet \
   --ao=alsa \
   ${MPV_AUDIO_DEVICE:+--audio-device=${MPV_AUDIO_DEVICE}}'
+StandardInput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
 Restart=always
 RestartSec=2
 
