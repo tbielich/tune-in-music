@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="<REPO_URL_PLACEHOLDER>"
+REPO_URL="${REPO_URL:-<REPO_URL_PLACEHOLDER>}"
 TARGET_DIR="/opt/tune-in-music"
 ENGINE_ENV_FILE="/etc/default/tune-in-music-engine"
 MPV_ENV_FILE="/etc/default/tune-in-music-mpv"
+SERVICE_USER="${SERVICE_USER:-$(id -un)}"
 
 if [[ "$REPO_URL" == "<REPO_URL_PLACEHOLDER>" ]]; then
   echo "Please set REPO_URL in this script before running it."
@@ -32,6 +33,8 @@ npm run build
 echo "[4/8] Installing systemd units"
 sudo cp "$TARGET_DIR/deploy/systemd/tune-in-music-mpv.service" /etc/systemd/system/
 sudo cp "$TARGET_DIR/deploy/systemd/tune-in-music-engine.service" /etc/systemd/system/
+sudo sed -i "s/^User=.*/User=${SERVICE_USER}/" /etc/systemd/system/tune-in-music-mpv.service
+sudo sed -i "s/^User=.*/User=${SERVICE_USER}/" /etc/systemd/system/tune-in-music-engine.service
 
 echo "[5/8] Creating default env files"
 if [[ ! -f "$ENGINE_ENV_FILE" ]]; then
