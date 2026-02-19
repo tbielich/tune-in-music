@@ -6,6 +6,7 @@ TARGET_DIR="/opt/tune-in-music"
 ENGINE_ENV_FILE="/etc/default/tune-in-music-engine"
 MPV_ENV_FILE="/etc/default/tune-in-music-mpv"
 SERVICE_USER="${SERVICE_USER:-$(id -un)}"
+SUDO_AS_USER=(sudo -H -u "$SERVICE_USER")
 
 if [[ "$REPO_URL" == "<REPO_URL_PLACEHOLDER>" ]]; then
   echo "Please set REPO_URL in this script before running it."
@@ -14,21 +15,29 @@ fi
 
 echo "[1/8] Installing dependencies"
 sudo apt-get update
-sudo apt-get install -y mpv yt-dlp git nodejs npm
+sudo apt-get install -y mpv yt-dlp git
+if ! command -v node >/dev/null 2>&1; then
+  sudo apt-get install -y nodejs
+fi
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm is missing. Install a Node.js distribution that includes npm and rerun."
+  exit 1
+fi
 
 echo "[2/8] Cloning/updating repository"
 if [[ -d "$TARGET_DIR/.git" ]]; then
-  sudo git -C "$TARGET_DIR" pull --ff-only
+  sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$TARGET_DIR"
+  "${SUDO_AS_USER[@]}" git -C "$TARGET_DIR" pull --ff-only
 else
   sudo mkdir -p /opt
-  sudo git clone "$REPO_URL" "$TARGET_DIR"
+  sudo mkdir -p "$TARGET_DIR"
+  sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$TARGET_DIR"
+  "${SUDO_AS_USER[@]}" git clone "$REPO_URL" "$TARGET_DIR"
 fi
-sudo chown -R pi:pi "$TARGET_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$TARGET_DIR"
 
 echo "[3/8] Installing engine dependencies and build"
-cd "$TARGET_DIR/engine"
-npm ci
-npm run build
+"${SUDO_AS_USER[@]}" bash -lc "cd '$TARGET_DIR/engine' && npm ci && npm run build"
 
 echo "[4/8] Installing systemd units"
 sudo cp "$TARGET_DIR/deploy/systemd/tune-in-music-mpv.service" /etc/systemd/system/
