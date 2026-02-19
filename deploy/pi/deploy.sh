@@ -4,6 +4,9 @@ set -euo pipefail
 cd /opt/tune-in-music
 git pull --ff-only
 
+sudo cp /opt/tune-in-music/deploy/systemd/tune-in-music-mpv.service /etc/systemd/system/
+sudo cp /opt/tune-in-music/deploy/systemd/tune-in-music-engine.service /etc/systemd/system/
+
 cd engine
 npm ci
 npm run build

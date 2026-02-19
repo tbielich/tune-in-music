@@ -8,6 +8,7 @@ Type=simple
 User=pi
 EnvironmentFile=-/etc/default/tune-in-music-mpv
 ExecStart=/bin/sh -c 'exec mpv \
+  --idle=yes \
   --fullscreen \
   --input-ipc-server=/tmp/mpv.sock \
   --cache=yes --cache-secs=30 \
