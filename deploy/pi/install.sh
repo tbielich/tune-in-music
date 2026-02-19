@@ -62,6 +62,8 @@ if [[ ! -f "$MPV_ENV_FILE" ]]; then
   sudo tee "$MPV_ENV_FILE" >/dev/null <<'ENVEOF'
 # Optional output override, e.g. alsa/plughw:CARD=Headphones,DEV=0
 MPV_AUDIO_DEVICE=
+# Pin mpv KMS/DRM output to one connector, e.g. HDMI-A-1 or HDMI-A-2
+MPV_DRM_CONNECTOR=HDMI-A-1
 ENVEOF
 fi
 

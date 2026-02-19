@@ -12,6 +12,7 @@ ExecStart=/bin/sh -c 'exec mpv \
   --fullscreen \
   --vo=gpu \
   --gpu-context=drm \
+  ${MPV_DRM_CONNECTOR:+--drm-connector=${MPV_DRM_CONNECTOR}} \
   --input-ipc-server=/tmp/mpv.sock \
   --cache=yes --cache-secs=30 \
   --demuxer-max-bytes=400M \

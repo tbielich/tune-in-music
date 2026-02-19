@@ -40,6 +40,7 @@ This runs:
 - Engine dist: `/opt/tune-in-music/engine/dist`
 - Engine env: `/etc/default/tune-in-music-engine`
 - mpv env: `/etc/default/tune-in-music-mpv`
+  - `MPV_DRM_CONNECTOR=HDMI-A-1` pins tune-in output to HDMI-1
 
 ## Useful commands
 
