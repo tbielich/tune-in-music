@@ -63,6 +63,8 @@ Important vars:
 - `MPV_SOCKET` (default `/tmp/mpv.sock`)
 - `YTDLP_BIN` (default `yt-dlp`)
 - `MPV_BIN` (default `mpv`)
+- `MPV_AUDIO_DEVICE` (optional, Pi ALSA device override)
+- `MPV_DRM_CONNECTOR` (optional, Pi DRM output pin, e.g. `HDMI-A-1`)
 
 ## Build
 

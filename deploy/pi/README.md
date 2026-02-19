@@ -2,12 +2,11 @@
 
 ## One-time install
 
-1. Edit `deploy/pi/install.sh` and replace `<REPO_URL_PLACEHOLDER>`.
-2. Run:
+Run:
 
 ```bash
 chmod +x deploy/pi/install.sh
-deploy/pi/install.sh
+REPO_URL=git@github.com:YOUR_USER/YOUR_REPO.git SERVICE_USER=pi deploy/pi/install.sh
 ```
 
 This will:
@@ -41,6 +40,7 @@ This runs:
 - Engine env: `/etc/default/tune-in-music-engine`
 - mpv env: `/etc/default/tune-in-music-mpv`
   - `MPV_DRM_CONNECTOR=HDMI-A-1` pins tune-in output to HDMI-1
+  - `MPV_AUDIO_DEVICE=alsa/plughw:CARD=vc4hdmi0,DEV=0` pins audio to HDMI-1
 
 ## Useful commands
 
@@ -50,3 +50,10 @@ sudo journalctl -u tune-in-music-engine -f
 curl -s http://127.0.0.1:3030/state | jq
 curl -s http://127.0.0.1:3030/health
 ```
+
+## Dual-display note
+
+Typical setup:
+
+- tune-in-music on HDMI-1 via `MPV_DRM_CONNECTOR=HDMI-A-1`
+- dashboard kiosk on HDMI-2 (Weston output `HDMI-A-2`)
