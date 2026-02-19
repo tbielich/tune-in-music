@@ -1,0 +1,16 @@
+[Unit]
+Description=tune-in-music engine
+After=tune-in-music-mpv.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/tune-in-music/engine
+EnvironmentFile=-/etc/default/tune-in-music-engine
+ExecStart=/usr/bin/node /opt/tune-in-music/engine/dist/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

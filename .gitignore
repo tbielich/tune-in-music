@@ -1,0 +1,4 @@
+engine/node_modules/
+engine/dist/
+engine/.env
+.DS_Store

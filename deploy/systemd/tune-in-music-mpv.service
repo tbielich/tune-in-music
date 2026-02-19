@@ -1,0 +1,27 @@
+[Unit]
+Description=tune-in-music mpv daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=-/etc/default/tune-in-music-mpv
+ExecStart=/bin/sh -c 'exec mpv \
+  --fullscreen \
+  --input-ipc-server=/tmp/mpv.sock \
+  --cache=yes --cache-secs=30 \
+  --demuxer-max-bytes=400M \
+  --demuxer-max-back-bytes=200M \
+  --hwdec=auto \
+  --vd-lavc-threads=2 \
+  --no-border \
+  --ontop \
+  --really-quiet \
+  --ao=alsa \
+  ${MPV_AUDIO_DEVICE:+--audio-device=${MPV_AUDIO_DEVICE}}'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
