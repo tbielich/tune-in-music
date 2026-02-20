@@ -21,7 +21,7 @@ interface UiAsset {
   contentType: string;
 }
 
-const UI_ROOT = path.resolve(__dirname, "../ui");
+const UI_ROOT = path.resolve(process.cwd(), "ui");
 
 const UI_ASSETS: Record<string, UiAsset> = {
   "/ui": {
