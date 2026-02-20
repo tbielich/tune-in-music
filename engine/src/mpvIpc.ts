@@ -14,6 +14,8 @@ interface PendingRequest {
   timeout: NodeJS.Timeout;
 }
 
+type PlaylistAdvanceMode = "force" | "weak";
+
 function toError(error: unknown): Error {
   if (error instanceof Error) {
     return error;
@@ -60,8 +62,26 @@ export class MpvIpc {
     await this.sendVoid(["loadfile", url, "append-play"]);
   }
 
-  async playlistNext(mode: "force" | "weak" = "force"): Promise<void> {
+  async playlistNext(force: boolean | PlaylistAdvanceMode = true): Promise<void> {
+    const mode = this.resolveAdvanceMode(force);
     await this.sendVoid(["playlist-next", mode]);
+  }
+
+  async playlistPrev(force: boolean | PlaylistAdvanceMode = true): Promise<void> {
+    const mode = this.resolveAdvanceMode(force);
+    await this.sendVoid(["playlist-prev", mode]);
+  }
+
+  async togglePause(): Promise<void> {
+    await this.sendVoid(["cycle", "pause"]);
+  }
+
+  async toggleMute(): Promise<void> {
+    await this.sendVoid(["cycle", "mute"]);
+  }
+
+  async addVolume(delta: number): Promise<void> {
+    await this.sendVoid(["add", "volume", delta]);
   }
 
   async getProperty<T = unknown>(name: string): Promise<T> {
@@ -79,6 +99,13 @@ export class MpvIpc {
 
   private async sendVoid(command: unknown[]): Promise<void> {
     await this.sendCommand(command);
+  }
+
+  private resolveAdvanceMode(force: boolean | PlaylistAdvanceMode): PlaylistAdvanceMode {
+    if (force === "force" || force === "weak") {
+      return force;
+    }
+    return force ? "force" : "weak";
   }
 
   private async sendCommand(command: unknown[], retry = true): Promise<unknown> {

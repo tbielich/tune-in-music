@@ -5,9 +5,10 @@ import { ChannelPlayer } from "./channelPlayer";
 import { channels, type ChannelId, type TrackInput } from "./channels";
 import { startHttpServer } from "./httpServer";
 import { logger } from "./logger";
+import { startMediaKeyListener } from "./mediaKeys";
 import { MpvIpc } from "./mpvIpc";
 import { StateStore, createInitialState, setState } from "./state";
-import type { EngineState, NowPlaying, ResolvedStream } from "./types";
+import type { EngineState, NowPlaying, PlaybackState, ResolvedStream } from "./types";
 import { resolveStreamUrl } from "./ytdlp";
 
 interface EngineConfig {
@@ -18,6 +19,7 @@ interface EngineConfig {
   mpvSocket: string;
   ytdlpBin: string;
   mpvBin: string;
+  enableMediaKeys: boolean;
 }
 
 function nowIso(): string {
@@ -75,6 +77,15 @@ function parsePort(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function parseEnabledFlag(value: string | undefined, fallback = false): boolean {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
 function readConfig(): EngineConfig {
   parseEnvFile(path.resolve(process.cwd(), ".env"));
 
@@ -91,6 +102,7 @@ function readConfig(): EngineConfig {
     mpvSocket: process.env.MPV_SOCKET ?? "/tmp/mpv.sock",
     ytdlpBin: process.env.YTDLP_BIN ?? "yt-dlp",
     mpvBin: process.env.MPV_BIN ?? "mpv",
+    enableMediaKeys: parseEnabledFlag(process.env.ENABLE_MEDIA_KEYS, false),
   };
 }
 
@@ -102,6 +114,7 @@ class Engine {
   private pollBusy = false;
   private reloadPromise?: Promise<void>;
   private retryTimer?: NodeJS.Timeout;
+  private stopMediaKeyListener?: () => void;
 
   constructor(private readonly config: EngineConfig) {
     this.stateStore = new StateStore(createInitialState(config.channelId));
@@ -126,6 +139,7 @@ class Engine {
       mpvSocket: this.config.mpvSocket,
       mpvBin: this.config.mpvBin,
       ytdlpBin: this.config.ytdlpBin,
+      enableMediaKeys: this.config.enableMediaKeys,
     });
 
     try {
@@ -138,12 +152,16 @@ class Engine {
     this.pollTimer = setInterval(() => {
       void this.poll();
     }, 1_000);
+
+    if (this.config.enableMediaKeys) {
+      this.startMediaKeys();
+    }
   }
 
   async skip(): Promise<void> {
     logger.info("skip_requested");
     try {
-      await this.mpv.playlistNext("force");
+      await this.mpv.playlistNext(true);
     } catch (error) {
       await this.handleFailure("skip_failed", error);
     }
@@ -194,6 +212,7 @@ class Engine {
       });
 
       await this.resolveAndQueueNext();
+      await this.refreshPlaybackState();
 
       logger.info("reload_complete", {
         reason,
@@ -213,13 +232,16 @@ class Engine {
     this.pollBusy = true;
 
     try {
-      const [playlistPosRaw, playlistCountRaw] = await Promise.all([
+      const [playlistPosRaw, playlistCountRaw, pausedForCacheRaw] = await Promise.all([
         this.mpv.getProperty<number>("playlist-pos"),
         this.mpv.getProperty<number>("playlist-count"),
+        this.mpv.getProperty<unknown>("paused-for-cache"),
       ]);
 
       const playlistPos = Number.isFinite(playlistPosRaw) ? Number(playlistPosRaw) : 0;
       const playlistCount = Number.isFinite(playlistCountRaw) ? Number(playlistCountRaw) : 0;
+      const buffering = pausedForCacheRaw === true;
+      this.setPlaybackPatch({ buffering });
 
       if (playlistPos > 0) {
         logger.info("playlist_pos_advanced", { playlistPos, playlistCount });
@@ -332,6 +354,92 @@ class Engine {
     return resolved;
   }
 
+  private startMediaKeys(): void {
+    try {
+      this.stopMediaKeyListener = startMediaKeyListener({
+        onTogglePause: () =>
+          this.runMediaKeyAction("TOGGLE_PAUSE", () => this.mpv.togglePause(), true),
+        onNext: () => this.runMediaKeyAction("NEXT", () => this.mpv.playlistNext(true)),
+        onPrev: () => this.runMediaKeyAction("PREV", () => this.mpv.playlistPrev(true)),
+        onReload: () => this.runMediaKeyAction("RELOAD", () => this.reload("media_key_reload")),
+        onVolUp: () => this.runMediaKeyAction("VOL_UP", () => this.mpv.addVolume(5), true),
+        onVolDown: () =>
+          this.runMediaKeyAction("VOL_DOWN", () => this.mpv.addVolume(-5), true),
+        onToggleMute: () =>
+          this.runMediaKeyAction("TOGGLE_MUTE", () => this.mpv.toggleMute(), true),
+      });
+    } catch (error) {
+      logger.warn("media_key_listener_start_failed", {
+        error: toError(error),
+      });
+    }
+  }
+
+  private async runMediaKeyAction(
+    action: string,
+    run: () => Promise<void>,
+    refreshPlaybackState = false,
+  ): Promise<void> {
+    try {
+      await run();
+      if (refreshPlaybackState) {
+        await this.refreshPlaybackState();
+      }
+    } catch (error) {
+      logger.warn("media_key_action_failed", {
+        action,
+        error: toError(error),
+      });
+    }
+  }
+
+  private async refreshPlaybackState(): Promise<void> {
+    try {
+      const [pausedRaw, volumeRaw, muteRaw] = await Promise.all([
+        this.mpv.getProperty<unknown>("pause"),
+        this.mpv.getProperty<unknown>("volume"),
+        this.mpv.getProperty<unknown>("mute"),
+      ]);
+
+      const playback: PlaybackState = {};
+      let hasPlaybackValue = false;
+
+      if (typeof pausedRaw === "boolean") {
+        playback.paused = pausedRaw;
+        hasPlaybackValue = true;
+      }
+
+      if (typeof volumeRaw === "number" && Number.isFinite(volumeRaw)) {
+        playback.volume = volumeRaw;
+        hasPlaybackValue = true;
+      }
+
+      if (typeof muteRaw === "boolean") {
+        playback.mute = muteRaw;
+        hasPlaybackValue = true;
+      }
+
+      if (!hasPlaybackValue) {
+        return;
+      }
+
+      this.setPlaybackPatch(playback);
+    } catch (error) {
+      logger.warn("playback_state_refresh_failed", {
+        error: toError(error),
+      });
+    }
+  }
+
+  private setPlaybackPatch(patch: Partial<PlaybackState>): void {
+    setState(this.stateStore, (previous) => ({
+      playback: {
+        ...(previous.playback ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
   private async handleFailure(event: string, error: unknown): Promise<void> {
     const err = toError(error);
     const nextFailStreak = this.stateStore.getState().failStreak + 1;
@@ -388,6 +496,11 @@ class Engine {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = undefined;
+    }
+
+    if (this.stopMediaKeyListener) {
+      this.stopMediaKeyListener();
+      this.stopMediaKeyListener = undefined;
     }
 
     this.mpv.close();

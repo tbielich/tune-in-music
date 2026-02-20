@@ -38,6 +38,8 @@ This runs:
 - Repo root: `/opt/tune-in-music`
 - Engine dist: `/opt/tune-in-music/engine/dist`
 - Engine env: `/etc/default/tune-in-music-engine`
+  - `ENABLE_MEDIA_KEYS=1` enables global media-key handling via `/dev/input/event*`
+  - If service user group membership changed (e.g. added to `input`), reboot or re-login is required
 - mpv env: `/etc/default/tune-in-music-mpv`
   - `MPV_DRM_CONNECTOR=HDMI-A-1` pins tune-in output to HDMI-1
   - `MPV_AUDIO_DEVICE=alsa/plughw:CARD=vc4hdmi0,DEV=0` pins audio to HDMI-1

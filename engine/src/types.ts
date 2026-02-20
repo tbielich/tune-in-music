@@ -17,11 +17,19 @@ export interface NowPlaying {
   startedAt?: string;
 }
 
+export interface PlaybackState {
+  paused?: boolean;
+  volume?: number;
+  mute?: boolean;
+  buffering?: boolean;
+}
+
 export interface EngineState {
   status: EngineStatus;
   channelId: ChannelId;
   current?: NowPlaying;
   next?: NowPlaying;
+  playback?: PlaybackState;
   lastError?: string;
   failStreak: number;
   updatedAt: string;

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tune-in-music VHS UI</title>
+    <link rel="stylesheet" href="/ui/style.css" />
+  </head>
+  <body>
+    <main class="tv" aria-label="tune-in-music VHS user interface">
+      <canvas id="colorbars" class="layer colorbars" aria-hidden="true"></canvas>
+      <canvas id="noise" class="layer noise" aria-hidden="true"></canvas>
+      <div class="layer scanlines" aria-hidden="true"></div>
+      <div class="layer vignette" aria-hidden="true"></div>
+
+      <header class="osd osd-top">
+        <div class="osd-row">
+          <span class="label">CHANNEL</span>
+          <span id="channel" class="value">-</span>
+        </div>
+        <div class="osd-row">
+          <span class="label">STATUS</span>
+          <span id="status" class="value status">LOADING</span>
+        </div>
+      </header>
+
+      <section class="osd osd-center">
+        <p class="track-line">
+          <span class="label">NOW</span>
+          <span id="current" class="value track">-</span>
+        </p>
+        <p class="track-line">
+          <span class="label">NEXT</span>
+          <span id="next" class="value track">-</span>
+        </p>
+      </section>
+
+      <footer class="osd osd-bottom">
+        <div class="osd-row">
+          <span class="label">PLAYBACK</span>
+          <span id="playback" class="value">-</span>
+        </div>
+        <div class="osd-row">
+          <span class="label">CLOCK</span>
+          <span id="clock" class="value">--:--:--</span>
+        </div>
+      </footer>
+    </main>
+
+    <script src="/ui/app.js"></script>
+  </body>
+</html>

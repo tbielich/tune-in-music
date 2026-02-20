@@ -16,6 +16,7 @@ Node.js + TypeScript engine for headless TV-like music playback with `mpv` IPC a
 ## Endpoints
 
 - `GET /` HTML status page with auto refresh and buttons
+- `GET /ui` VHS/TV web UI for LAN displays
 - `GET /state` JSON engine state
 - `GET /health` JSON health status (`200` when healthy, `503` on `ERROR`)
 - `POST /skip` skip current track (`playlist-next force`)
@@ -48,6 +49,7 @@ Open:
 
 ```text
 http://localhost:3030
+http://localhost:3030/ui
 ```
 
 ## Production runtime
@@ -63,8 +65,44 @@ Important vars:
 - `MPV_SOCKET` (default `/tmp/mpv.sock`)
 - `YTDLP_BIN` (default `yt-dlp`)
 - `MPV_BIN` (default `mpv`)
+- `ENABLE_MEDIA_KEYS` (default `0`)
 - `MPV_AUDIO_DEVICE` (optional, Pi ALSA device override)
 - `MPV_DRM_CONNECTOR` (optional, Pi DRM output pin, e.g. `HDMI-A-1`)
+
+## Media keys (Iteration 2)
+
+Enable global media-key handling (Linux evdev, independent from window focus):
+
+1. Set in `/etc/default/tune-in-music-engine`:
+
+```bash
+ENABLE_MEDIA_KEYS=1
+```
+
+2. Restart engine service:
+
+```bash
+sudo systemctl restart tune-in-music-engine
+```
+
+Notes:
+
+- Listener is Linux-only (`process.platform === "linux"`).
+- Service user must be in group `input` to read `/dev/input/event*`.
+- For troubleshooting key events, `evtest` is useful:
+
+```bash
+sudo evtest
+```
+
+## UI states
+
+The `/ui` page maps engine state and health into a TV-style overlay:
+
+- `PLAYING`: normal playback
+- `RESOLVING`: stream URL resolving/queue filling (`RESOLVING_CURRENT` or `RESOLVING_NEXT`)
+- `BUFFERING`: mpv reports cache buffering (`playback.buffering === true`)
+- `ERROR`: engine status is `ERROR` or health checks fail
 
 ## Build
 

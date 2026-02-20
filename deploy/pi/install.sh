@@ -55,6 +55,7 @@ TV_FORMAT=best[height<=480]
 MPV_SOCKET=/tmp/mpv.sock
 YTDLP_BIN=yt-dlp
 MPV_BIN=mpv
+ENABLE_MEDIA_KEYS=0
 ENVEOF
 fi
 
