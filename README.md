@@ -5,7 +5,7 @@ Music-TV setup for Raspberry Pi with:
 - `mpv` daemon (JSON IPC via `/tmp/mpv.sock`)
 - Node.js/TypeScript control engine
 - `yt-dlp` stream resolving (no YouTube API)
-- Headless LAN control via HTTP (`/`, `/state`, `/health`, `/skip`, `/reload`)
+- Headless LAN control via HTTP (`/`, `/ui`, `/state`, `/health`, `/skip`, `/reload`)
 
 ## Repository structure
 
@@ -17,6 +17,12 @@ Music-TV setup for Raspberry Pi with:
 
 - Engine documentation: `engine/README.md`
 - Pi deployment documentation: `deploy/pi/README.md`
+
+## UI
+
+- On the Pi itself: `http://127.0.0.1:3030/ui`
+- From another LAN device: `http://<PI-IP>:3030/ui` (e.g. `http://192.168.20.20:3030/ui`)
+- JSON/status endpoints remain available at `/state` and `/health`
 
 ## Typical Pi setup
 
