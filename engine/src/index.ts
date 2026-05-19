@@ -139,7 +139,7 @@ class Engine {
       await this.resolveSpotifyTracks();
     }
 
-    if (this.channelPlayer.getTrackCount() === 0) {
+    if (this.channelPlayer.getTrackCount() === 0 && this.config.channelId !== "spotify") {
       throw new Error(`Channel ${this.config.channelId} has no tracks`);
     }
 
@@ -228,7 +228,8 @@ class Engine {
 
       const currentTrack = this.channelPlayer.getCurrentTrack();
       if (!currentTrack) {
-        throw new Error("Channel is empty and cannot be played");
+        logger.warn("reload_skipped_no_tracks", { reason });
+        return;
       }
 
       await this.showNoise();
