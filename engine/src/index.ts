@@ -7,6 +7,7 @@ import { startHttpServer } from "./httpServer";
 import { logger } from "./logger";
 import { startMediaKeyListener } from "./mediaKeys";
 import { MpvIpc } from "./mpvIpc";
+import { resolveSpotifyPlaylist, type SpotifyResolveOptions } from "./spotify";
 import { StateStore, createInitialState, setState } from "./state";
 import type { EngineState, NowPlaying, PlaybackState, ResolvedStream } from "./types";
 import { resolveStreamUrl } from "./ytdlp";
@@ -20,6 +21,8 @@ interface EngineConfig {
   ytdlpBin: string;
   mpvBin: string;
   enableMediaKeys: boolean;
+  spotifyPlaylistUrl: string;
+  spotifyRefreshMinutes: number;
 }
 
 function nowIso(): string {
@@ -103,6 +106,8 @@ function readConfig(): EngineConfig {
     ytdlpBin: process.env.YTDLP_BIN ?? "yt-dlp",
     mpvBin: process.env.MPV_BIN ?? "mpv",
     enableMediaKeys: parseEnabledFlag(process.env.ENABLE_MEDIA_KEYS, false),
+    spotifyPlaylistUrl: process.env.SPOTIFY_PLAYLIST_URL ?? "",
+    spotifyRefreshMinutes: parsePort(process.env.SPOTIFY_REFRESH_MINUTES, 15),
   };
 }
 
@@ -115,6 +120,7 @@ class Engine {
   private reloadPromise?: Promise<void>;
   private retryTimer?: NodeJS.Timeout;
   private stopMediaKeyListener?: () => void;
+  private spotifyRefreshTimer?: NodeJS.Timeout;
 
   constructor(private readonly config: EngineConfig) {
     this.stateStore = new StateStore(createInitialState(config.channelId));
@@ -127,7 +133,11 @@ class Engine {
   }
 
   async start(): Promise<void> {
-    if (channels[this.config.channelId].tracks.length === 0) {
+    if (this.config.channelId === "spotify" && this.config.spotifyPlaylistUrl) {
+      await this.resolveSpotifyTracks();
+    }
+
+    if (this.channelPlayer.getTrackCount() === 0) {
       throw new Error(`Channel ${this.config.channelId} has no tracks`);
     }
 
@@ -140,6 +150,8 @@ class Engine {
       mpvBin: this.config.mpvBin,
       ytdlpBin: this.config.ytdlpBin,
       enableMediaKeys: this.config.enableMediaKeys,
+      spotifyPlaylistUrl: this.config.spotifyPlaylistUrl || undefined,
+      trackCount: this.channelPlayer.getTrackCount(),
     });
 
     try {
@@ -155,6 +167,13 @@ class Engine {
 
     if (this.config.enableMediaKeys) {
       this.startMediaKeys();
+    }
+
+    if (this.config.channelId === "spotify" && this.config.spotifyPlaylistUrl) {
+      const refreshMs = this.config.spotifyRefreshMinutes * 60 * 1_000;
+      this.spotifyRefreshTimer = setInterval(() => {
+        void this.refreshSpotifyTracks();
+      }, refreshMs);
     }
   }
 
@@ -498,12 +517,53 @@ class Engine {
       this.retryTimer = undefined;
     }
 
+    if (this.spotifyRefreshTimer) {
+      clearInterval(this.spotifyRefreshTimer);
+      this.spotifyRefreshTimer = undefined;
+    }
+
     if (this.stopMediaKeyListener) {
       this.stopMediaKeyListener();
       this.stopMediaKeyListener = undefined;
     }
 
     this.mpv.close();
+  }
+
+  private async resolveSpotifyTracks(): Promise<void> {
+    const options: SpotifyResolveOptions = {
+      ytdlpBin: this.config.ytdlpBin,
+      timeoutMs: 20_000,
+    };
+
+    const tracks = await resolveSpotifyPlaylist(
+      this.config.spotifyPlaylistUrl,
+      options,
+    );
+
+    this.channelPlayer.setTracks(tracks);
+  }
+
+  private async refreshSpotifyTracks(): Promise<void> {
+    try {
+      logger.info("spotify_refresh_start");
+      const options: SpotifyResolveOptions = {
+        ytdlpBin: this.config.ytdlpBin,
+        timeoutMs: 20_000,
+      };
+
+      const tracks = await resolveSpotifyPlaylist(
+        this.config.spotifyPlaylistUrl,
+        options,
+      );
+
+      this.channelPlayer.setTracks(tracks);
+      logger.info("spotify_refresh_done", { trackCount: tracks.length });
+    } catch (error) {
+      logger.warn("spotify_refresh_failed", {
+        error: toError(error),
+      });
+    }
   }
 }
 

@@ -1,11 +1,20 @@
 import type { ChannelDef, TrackInput } from "./channels";
 
 export class ChannelPlayer {
-  private readonly tracks: TrackInput[];
+  private tracks: TrackInput[];
   private cursor = 0;
 
   constructor(channel: ChannelDef) {
     this.tracks = channel.tracks;
+  }
+
+  setTracks(tracks: TrackInput[]): void {
+    this.tracks = tracks;
+    this.cursor = 0;
+  }
+
+  getTrackCount(): number {
+    return this.tracks.length;
   }
 
   getCurrentTrack(): TrackInput | undefined {

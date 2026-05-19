@@ -1,4 +1,4 @@
-export type ChannelId = "overallTop10" | "mtv80s" | "viva90s";
+export type ChannelId = "overallTop10" | "mtv80s" | "viva90s" | "spotify";
 
 export interface TrackInput {
   id: string;
@@ -77,6 +77,11 @@ export const channels: Record<ChannelId, ChannelDef> = {
   viva90s: {
     id: "viva90s",
     label: "VIVA 90s",
+    tracks: [],
+  },
+  spotify: {
+    id: "spotify",
+    label: "Spotify Playlist",
     tracks: [],
   },
 };
