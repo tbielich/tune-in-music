@@ -9,6 +9,10 @@ export interface HttpEngineController {
   getState: () => EngineState;
   skip: () => Promise<void>;
   reload: () => Promise<void>;
+  togglePause: () => Promise<void>;
+  volumeUp: () => Promise<void>;
+  volumeDown: () => Promise<void>;
+  toggleMute: () => Promise<void>;
 }
 
 export interface HttpServerConfig {
@@ -76,56 +80,87 @@ function renderHomeHtml(state: EngineState): string {
   const current = state.current?.track.label ?? "-";
   const next = state.next?.track.label ?? "-";
   const status = state.status;
-  const pausedText =
-    state.playback?.paused === undefined ? "-" : state.playback.paused ? "yes" : "no";
-  const muteText = state.playback?.mute === undefined ? "-" : state.playback.mute ? "yes" : "no";
-  const volumeText =
+  const paused = state.playback?.paused === true;
+  const muted = state.playback?.mute === true;
+  const volume =
     typeof state.playback?.volume === "number" && Number.isFinite(state.playback.volume)
-      ? String(Math.round(state.playback.volume))
-      : "-";
+      ? Math.round(state.playback.volume)
+      : -1;
 
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="3" />
-    <title>tune-in-music</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>tune-in-music remote</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 20px; }
-      .grid { display: grid; gap: 8px; max-width: 800px; }
-      .actions { display: flex; gap: 8px; margin-top: 12px; }
-      button { padding: 8px 14px; }
-      pre { background: #f3f3f3; padding: 12px; overflow: auto; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #1a1a2e; color: #eee;
+        min-height: 100dvh; padding: 16px;
+        display: flex; flex-direction: column; gap: 16px;
+      }
+      .now-playing {
+        text-align: center; padding: 12px;
+        background: rgba(255,255,255,0.05); border-radius: 12px;
+      }
+      .now-playing .track { font-size: 1.2rem; font-weight: 600; margin: 4px 0; }
+      .now-playing .meta { font-size: 0.8rem; color: #999; }
+      .next { font-size: 0.85rem; color: #777; text-align: center; }
+      .controls {
+        display: grid; grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px; max-width: 400px; margin: 0 auto; width: 100%;
+      }
+      .controls button {
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+        color: #eee; border-radius: 12px; padding: 16px 8px;
+        font-size: 1.4rem; cursor: pointer; transition: background 0.15s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .controls button:active { background: rgba(255,255,255,0.25); }
+      .controls button.active { background: rgba(100,200,255,0.2); border-color: rgba(100,200,255,0.4); }
+      .controls button.wide { grid-column: span 3; font-size: 1rem; padding: 14px; }
+      .volume-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+      .volume-row .vol-label { font-size: 0.9rem; min-width: 40px; text-align: center; }
+      .status-bar {
+        text-align: center; font-size: 0.75rem; color: #666; margin-top: auto;
+      }
+      .status-bar a { color: #888; }
     </style>
   </head>
   <body>
-    <h1>tune-in-music</h1>
-    <p><a href="/ui"><strong>Open VHS UI: /ui</strong></a></p>
-    <div class="grid">
-      <div><strong>Status:</strong> ${escapeHtml(status)}</div>
-      <div><strong>Channel:</strong> ${escapeHtml(state.channelId)}</div>
-      <div><strong>Current:</strong> ${escapeHtml(current)}</div>
-      <div><strong>Next:</strong> ${escapeHtml(next)}</div>
-      <div><strong>Paused:</strong> ${escapeHtml(pausedText)}</div>
-      <div><strong>Volume:</strong> ${escapeHtml(volumeText)}</div>
-      <div><strong>Muted:</strong> ${escapeHtml(muteText)}</div>
-      <div><strong>Fail streak:</strong> ${state.failStreak}</div>
-      <div><strong>Updated:</strong> ${escapeHtml(state.updatedAt)}</div>
-      <div><strong>Last error:</strong> ${escapeHtml(state.lastError ?? "-")}</div>
+    <div class="now-playing">
+      <div class="meta">${escapeHtml(state.channelId)} &middot; ${escapeHtml(status)}</div>
+      <div class="track">${escapeHtml(current)}</div>
+    </div>
+    <div class="next">Next: ${escapeHtml(next)}</div>
+
+    <div class="controls">
+      <button onclick="post('/vol-down')" aria-label="Volume down">🔉</button>
+      <button onclick="post('/toggle-pause')" class="${paused ? "active" : ""}" aria-label="Play/Pause">${paused ? "▶️" : "⏸️"}</button>
+      <button onclick="post('/vol-up')" aria-label="Volume up">🔊</button>
+
+      <button onclick="post('/skip')" aria-label="Skip">⏭️</button>
+      <button onclick="post('/toggle-mute')" class="${muted ? "active" : ""}" aria-label="Mute">${muted ? "🔇" : "🔈"}</button>
+      <button onclick="post('/reload')" aria-label="Reload">🔄</button>
     </div>
 
-    <div class="actions">
-      <form method="post" action="/skip">
-        <button type="submit">Skip</button>
-      </form>
-      <form method="post" action="/reload">
-        <button type="submit">Reload</button>
-      </form>
+    <div class="volume-row">
+      <span class="vol-label">${volume >= 0 ? `${volume}%` : "-"}</span>
     </div>
 
-    <h2>State JSON</h2>
-    <pre>${escapeHtml(JSON.stringify(state, null, 2))}</pre>
+    <div class="status-bar">
+      <a href="/ui">VHS UI</a> &middot; <a href="/state">JSON</a>
+    </div>
+
+    <script>
+      function post(path) {
+        fetch(path, { method: 'POST' }).then(() => {
+          setTimeout(() => location.reload(), 300);
+        });
+      }
+    </script>
   </body>
 </html>`;
 }
@@ -204,6 +239,30 @@ export function startHttpServer(
         await engine.reload();
         res.writeHead(303, { location: "/" });
         res.end();
+        return;
+      }
+
+      if (method === "POST" && pathname === "/toggle-pause") {
+        await engine.togglePause();
+        writeJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (method === "POST" && pathname === "/vol-up") {
+        await engine.volumeUp();
+        writeJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (method === "POST" && pathname === "/vol-down") {
+        await engine.volumeDown();
+        writeJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (method === "POST" && pathname === "/toggle-mute") {
+        await engine.toggleMute();
+        writeJson(res, 200, { ok: true });
         return;
       }
 

@@ -186,6 +186,26 @@ class Engine {
     }
   }
 
+  async togglePause(): Promise<void> {
+    await this.mpv.togglePause();
+    await this.refreshPlaybackState();
+  }
+
+  async volumeUp(): Promise<void> {
+    await this.mpv.addVolume(5);
+    await this.refreshPlaybackState();
+  }
+
+  async volumeDown(): Promise<void> {
+    await this.mpv.addVolume(-5);
+    await this.refreshPlaybackState();
+  }
+
+  async toggleMute(): Promise<void> {
+    await this.mpv.toggleMute();
+    await this.refreshPlaybackState();
+  }
+
   async reload(reason = "manual"): Promise<void> {
     if (this.reloadPromise) {
       return this.reloadPromise;
@@ -580,6 +600,10 @@ async function main(): Promise<void> {
       getState: () => engine.getState(),
       skip: () => engine.skip(),
       reload: () => engine.reload(),
+      togglePause: () => engine.togglePause(),
+      volumeUp: () => engine.volumeUp(),
+      volumeDown: () => engine.volumeDown(),
+      toggleMute: () => engine.toggleMute(),
     },
   );
 
