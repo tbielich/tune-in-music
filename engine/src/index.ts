@@ -23,6 +23,7 @@ interface EngineConfig {
   enableMediaKeys: boolean;
   spotifyPlaylistUrl: string;
   spotifyRefreshMinutes: number;
+  noiseVideoPath: string;
 }
 
 function nowIso(): string {
@@ -108,6 +109,7 @@ function readConfig(): EngineConfig {
     enableMediaKeys: parseEnabledFlag(process.env.ENABLE_MEDIA_KEYS, false),
     spotifyPlaylistUrl: process.env.SPOTIFY_PLAYLIST_URL ?? "",
     spotifyRefreshMinutes: parsePort(process.env.SPOTIFY_REFRESH_MINUTES, 15),
+    noiseVideoPath: process.env.NOISE_VIDEO_PATH ?? path.resolve(process.cwd(), "static-noise.mp4"),
   };
 }
 
@@ -228,6 +230,8 @@ class Engine {
       if (!currentTrack) {
         throw new Error("Channel is empty and cannot be played");
       }
+
+      await this.showNoise();
 
       setState(this.stateStore, {
         status: "RESOLVING_CURRENT",
@@ -367,6 +371,18 @@ class Engine {
       trackId: nextTrack.id,
       url: nextResolved.url,
     });
+  }
+
+  private async showNoise(): Promise<void> {
+    if (!fs.existsSync(this.config.noiseVideoPath)) {
+      return;
+    }
+    try {
+      await this.mpv.loadReplace(this.config.noiseVideoPath);
+      await this.mpv.setProperty("loop-file", "inf");
+    } catch {
+      // best-effort, don't fail if noise can't be shown
+    }
   }
 
   private async resolveTrack(
