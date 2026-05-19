@@ -120,7 +120,6 @@ function renderHomeHtml(state: EngineState): string {
       }
       .controls button:active { background: rgba(255,255,255,0.25); }
       .controls button.active { background: rgba(100,200,255,0.2); border-color: rgba(100,200,255,0.4); }
-      .controls button.wide { grid-column: span 3; font-size: 1rem; padding: 14px; }
       .volume-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
       .volume-row .vol-label { font-size: 0.9rem; min-width: 40px; text-align: center; }
       .status-bar {
@@ -131,23 +130,23 @@ function renderHomeHtml(state: EngineState): string {
   </head>
   <body>
     <div class="now-playing">
-      <div class="meta">${escapeHtml(state.channelId)} &middot; ${escapeHtml(status)}</div>
-      <div class="track">${escapeHtml(current)}</div>
+      <div class="meta" id="meta"></div>
+      <div class="track" id="track"></div>
     </div>
-    <div class="next">Next: ${escapeHtml(next)}</div>
+    <div class="next" id="next"></div>
 
     <div class="controls">
-      <button onclick="post('/vol-down')" aria-label="Volume down">🔉</button>
-      <button onclick="post('/toggle-pause')" class="${paused ? "active" : ""}" aria-label="Play/Pause">${paused ? "▶️" : "⏸️"}</button>
-      <button onclick="post('/vol-up')" aria-label="Volume up">🔊</button>
+      <button id="btn-vol-down" aria-label="Volume down">🔉</button>
+      <button id="btn-pause" aria-label="Play/Pause">⏸️</button>
+      <button id="btn-vol-up" aria-label="Volume up">🔊</button>
 
-      <button onclick="post('/skip')" aria-label="Skip">⏭️</button>
-      <button onclick="post('/toggle-mute')" class="${muted ? "active" : ""}" aria-label="Mute">${muted ? "🔇" : "🔈"}</button>
-      <button onclick="post('/reload')" aria-label="Reload">🔄</button>
+      <button id="btn-skip" aria-label="Skip">⏭️</button>
+      <button id="btn-mute" aria-label="Mute">🔈</button>
+      <button id="btn-reload" aria-label="Reload">🔄</button>
     </div>
 
     <div class="volume-row">
-      <span class="vol-label">${volume >= 0 ? `${volume}%` : "-"}</span>
+      <span class="vol-label" id="vol-label">-</span>
     </div>
 
     <div class="status-bar">
@@ -155,11 +154,56 @@ function renderHomeHtml(state: EngineState): string {
     </div>
 
     <script>
+    (function() {
+      var busy = false;
+
       function post(path) {
-        fetch(path, { method: 'POST' }).then(() => {
-          setTimeout(() => location.reload(), 300);
-        });
+        if (busy) return;
+        busy = true;
+        fetch(path, { method: 'POST' })
+          .then(function() { setTimeout(poll, 400); })
+          .catch(function() {})
+          .finally(function() { busy = false; });
       }
+
+      function poll() {
+        fetch('/state', { cache: 'no-store' })
+          .then(function(r) { return r.json(); })
+          .then(render)
+          .catch(function() {});
+      }
+
+      function render(s) {
+        var current = (s.current && s.current.track && s.current.track.label) || '-';
+        var next = (s.next && s.next.track && s.next.track.label) || '-';
+        var paused = s.playback && s.playback.paused === true;
+        var muted = s.playback && s.playback.mute === true;
+        var vol = (s.playback && typeof s.playback.volume === 'number') ? Math.round(s.playback.volume) : -1;
+
+        document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
+        document.getElementById('track').textContent = current;
+        document.getElementById('next').textContent = 'Next: ' + next;
+        document.getElementById('vol-label').textContent = vol >= 0 ? vol + '%' : '-';
+
+        var pauseBtn = document.getElementById('btn-pause');
+        pauseBtn.textContent = paused ? '\\u25b6\\ufe0f' : '\\u23f8\\ufe0f';
+        pauseBtn.className = paused ? 'active' : '';
+
+        var muteBtn = document.getElementById('btn-mute');
+        muteBtn.textContent = muted ? '\\ud83d\\udd07' : '\\ud83d\\udd08';
+        muteBtn.className = muted ? 'active' : '';
+      }
+
+      document.getElementById('btn-vol-down').onclick = function() { post('/vol-down'); };
+      document.getElementById('btn-vol-up').onclick = function() { post('/vol-up'); };
+      document.getElementById('btn-pause').onclick = function() { post('/toggle-pause'); };
+      document.getElementById('btn-skip').onclick = function() { post('/skip'); };
+      document.getElementById('btn-mute').onclick = function() { post('/toggle-mute'); };
+      document.getElementById('btn-reload').onclick = function() { post('/reload'); };
+
+      render(${JSON.stringify({ status, channelId: state.channelId, current: state.current, next: state.next, playback: state.playback })});
+      setInterval(poll, 2000);
+    })();
     </script>
   </body>
 </html>`;
