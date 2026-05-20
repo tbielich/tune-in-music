@@ -241,6 +241,7 @@ class Engine {
       });
 
       const currentResolved = await this.resolveTrack(currentTrack, "current");
+      await this.mpv.setProperty("loop-file", "no");
       await this.mpv.loadReplace(currentResolved.url);
 
       setState(this.stateStore, {
