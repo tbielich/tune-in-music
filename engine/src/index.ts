@@ -7,7 +7,7 @@ import { startHttpServer } from "./httpServer";
 import { logger } from "./logger";
 import { startMediaKeyListener } from "./mediaKeys";
 import { MpvIpc } from "./mpvIpc";
-import { resolveSpotifyPlaylist, type SpotifyResolveOptions } from "./spotify";
+import { type SpotifyResolveOptions } from "./spotify";
 import { StateStore, createInitialState, setState } from "./state";
 import type { EngineState, NowPlaying, PlaybackState, ResolvedStream } from "./types";
 import { VideoCache } from "./videoCache";
@@ -629,25 +629,75 @@ class Engine {
   }
 
   private async resolveSpotifyTracks(): Promise<void> {
+    const { fetchSpotifyPlaylistTracks, searchYouTubeUrl } = await import("./spotify");
+
+    // Step 1: Fetch track names from Spotify (fast, single HTTP request)
+    const queries = await fetchSpotifyPlaylistTracks(this.config.spotifyPlaylistUrl);
+
+    logger.info("spotify_playlist_fetched", { trackCount: queries.length });
+
+    // Step 2: Resolve just the first 2 tracks to start playback immediately
     const options: SpotifyResolveOptions = {
       ytdlpBin: this.config.ytdlpBin,
       timeoutMs: 20_000,
     };
 
-    const tracks = await resolveSpotifyPlaylist(
-      this.config.spotifyPlaylistUrl,
-      options,
-    );
+    const initialTracks: TrackInput[] = [];
+    for (const query of queries.slice(0, 2)) {
+      try {
+        const url = await searchYouTubeUrl(query, options);
+        const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+        initialTracks.push({ id, label: query, input: url });
+      } catch {
+        // skip failed
+      }
+    }
 
-    this.channelPlayer.setTracks(tracks);
+    if (initialTracks.length > 0) {
+      this.channelPlayer.setTracks(initialTracks);
+    }
 
-    // Start background download of all tracks
-    this.videoCache.downloadInBackground(tracks);
+    // Step 3: Resolve remaining tracks in background, then update playlist
+    void this.resolveRemainingSpotifyTracks(queries, options, initialTracks);
+  }
+
+  private async resolveRemainingSpotifyTracks(
+    queries: string[],
+    options: SpotifyResolveOptions,
+    alreadyResolved: TrackInput[],
+  ): Promise<void> {
+    const { searchYouTubeUrl } = await import("./spotify");
+    const allTracks = [...alreadyResolved];
+    const resolvedIds = new Set(alreadyResolved.map((t) => t.id));
+
+    for (const query of queries.slice(2)) {
+      try {
+        const url = await searchYouTubeUrl(query, options);
+        const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+        if (!resolvedIds.has(id)) {
+          allTracks.push({ id, label: query, input: url });
+          resolvedIds.add(id);
+        }
+      } catch (error) {
+        logger.warn("spotify_track_resolve_failed", {
+          query,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Update playlist with all tracks (keeps current playback position)
+    this.channelPlayer.setTracks(allTracks);
+    logger.info("spotify_all_tracks_resolved", { total: allTracks.length });
+
+    // Start background cache download
+    this.videoCache.downloadInBackground(allTracks);
   }
 
   private async refreshSpotifyTracks(): Promise<void> {
     try {
       logger.info("spotify_refresh_start");
+      const { resolveSpotifyPlaylist } = await import("./spotify");
       const options: SpotifyResolveOptions = {
         ytdlpBin: this.config.ytdlpBin,
         timeoutMs: 20_000,
