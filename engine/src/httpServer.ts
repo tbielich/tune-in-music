@@ -205,13 +205,13 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
     </div>
 
     <div class="controls">
-      <button id="btn-reload" aria-label="Reload">🔄</button>
-      <button id="btn-pause" class="primary" aria-label="Play/Pause">⏸️</button>
-      <button id="btn-skip" aria-label="Skip">⏭️</button>
+      <button id="btn-reload" aria-label="Reload">&#x21bb;</button>
+      <button id="btn-pause" class="primary" aria-label="Play/Pause">&#x23f8;</button>
+      <button id="btn-skip" aria-label="Skip">&#x23ed;</button>
     </div>
 
     <div class="volume-section">
-      <span class="vol-icon" id="btn-mute">🔊</span>
+      <span class="vol-icon" id="btn-mute">&#x266b;</span>
       <input type="range" id="vol-slider" min="0" max="100" value="${volume}" />
       <span class="vol-value" id="vol-label">${volume}%</span>
     </div>
@@ -273,15 +273,15 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
 
         var pauseBtn = document.getElementById('btn-pause');
-        pauseBtn.textContent = paused ? '\\u25b6\\ufe0f' : '\\u23f8\\ufe0f';
+        pauseBtn.textContent = paused ? '\\u25b6' : '\\u23f8';
         pauseBtn.className = paused ? 'primary active' : 'primary';
 
         var muteIcon = document.getElementById('btn-mute');
-        muteIcon.textContent = muted ? '\\ud83d\\udd07' : '\\ud83d\\udd0a';
+        muteIcon.textContent = muted ? '\\u2715' : '\\u266b';
 
         if (vol >= 0) {
-          document.getElementById('vol-slider').value = vol;
-          document.getElementById('vol-label').textContent = vol + '%';
+          document.getElementById('vol-slider').value = muted ? 0 : vol;
+          document.getElementById('vol-label').textContent = muted ? '0%' : vol + '%';
         }
       }
 
