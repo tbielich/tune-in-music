@@ -284,6 +284,7 @@ class Engine {
 
       await this.resolveAndQueueNext();
       await this.refreshPlaybackState();
+      await this.showTrackOsd(currentTrack);
 
       logger.info("reload_complete", {
         reason,
@@ -362,6 +363,7 @@ class Engine {
     });
 
     await this.resolveAndQueueNext();
+    await this.showTrackOsd(track);
   }
 
   private async resolveAndQueueNext(): Promise<void> {
@@ -410,6 +412,14 @@ class Engine {
       await this.mpv.setProperty("loop-file", "inf");
     } catch {
       // best-effort, don't fail if noise can't be shown
+    }
+  }
+
+  private async showTrackOsd(track: TrackInput): Promise<void> {
+    try {
+      await this.mpv.showOsd(track.label, 8000);
+    } catch {
+      // non-critical
     }
   }
 

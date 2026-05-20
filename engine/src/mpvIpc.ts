@@ -93,6 +93,10 @@ export class MpvIpc {
     await this.sendVoid(["set_property", name, value]);
   }
 
+  async showOsd(text: string, durationMs = 5000): Promise<void> {
+    await this.sendVoid(["show-text", text, durationMs]);
+  }
+
   async removePlaylistIndex(index: number): Promise<void> {
     await this.sendVoid(["playlist-remove", index]);
   }
