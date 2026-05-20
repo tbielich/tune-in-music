@@ -88,6 +88,7 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
     typeof state.playback?.volume === "number" && Number.isFinite(state.playback.volume)
       ? Math.round(state.playback.volume)
       : -1;
+  const playlistId = playlistUrl.match(/\/playlist\/([A-Za-z0-9]+)/)?.[1] ?? "";
 
   return `<!doctype html>
 <html lang="en">
@@ -165,7 +166,7 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
     </div>
 
     <div class="playlist-input">
-      <input id="playlist-url" type="url" placeholder="Spotify Playlist URL..." value="${escapeHtml(playlistUrl)}" />
+      <input id="playlist-url" type="text" placeholder="Playlist-ID eingeben..." value="${escapeHtml(playlistId)}" />
       <button id="btn-playlist">Laden</button>
     </div>
 
@@ -221,8 +222,9 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
       document.getElementById('btn-mute').onclick = function() { post('/toggle-mute'); };
       document.getElementById('btn-reload').onclick = function() { post('/reload'); };
       document.getElementById('btn-playlist').onclick = function() {
-        var url = document.getElementById('playlist-url').value.trim();
-        if (!url) return;
+        var id = document.getElementById('playlist-url').value.trim();
+        if (!id) return;
+        var url = 'https://open.spotify.com/playlist/' + id;
         fetch('/change-playlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
