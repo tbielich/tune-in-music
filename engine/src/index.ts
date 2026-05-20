@@ -234,6 +234,17 @@ class Engine {
     await this.refreshPlaybackState();
   }
 
+  async changePlaylist(url: string): Promise<void> {
+    logger.info("playlist_change_requested", { url });
+    this.config.spotifyPlaylistUrl = url;
+    await this.resolveSpotifyTracks();
+    await this.reload("playlist_change");
+  }
+
+  getPlaylistUrl(): string {
+    return this.config.spotifyPlaylistUrl;
+  }
+
   async reload(reason = "manual"): Promise<void> {
     if (this.reloadPromise) {
       return this.reloadPromise;
@@ -756,6 +767,8 @@ async function main(): Promise<void> {
       volumeUp: () => engine.volumeUp(),
       volumeDown: () => engine.volumeDown(),
       toggleMute: () => engine.toggleMute(),
+      changePlaylist: (url: string) => engine.changePlaylist(url),
+      getPlaylistUrl: () => engine.getPlaylistUrl(),
     },
   );
 

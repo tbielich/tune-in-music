@@ -13,6 +13,8 @@ export interface HttpEngineController {
   volumeUp: () => Promise<void>;
   volumeDown: () => Promise<void>;
   toggleMute: () => Promise<void>;
+  changePlaylist: (url: string) => Promise<void>;
+  getPlaylistUrl: () => string;
 }
 
 export interface HttpServerConfig {
@@ -76,7 +78,7 @@ function writeContent(
   res.end(content);
 }
 
-function renderHomeHtml(state: EngineState): string {
+function renderHomeHtml(state: EngineState, playlistUrl: string): string {
   const current = state.current?.track.label ?? "-";
   const next = state.next?.track.label ?? "-";
   const status = state.status;
@@ -122,6 +124,19 @@ function renderHomeHtml(state: EngineState): string {
       .controls button.active { background: rgba(100,200,255,0.2); border-color: rgba(100,200,255,0.4); }
       .volume-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
       .volume-row .vol-label { font-size: 0.9rem; min-width: 40px; text-align: center; }
+      .playlist-input {
+        display: flex; gap: 8px; max-width: 400px; margin: 0 auto; width: 100%;
+      }
+      .playlist-input input {
+        flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+        color: #eee; border-radius: 8px; padding: 10px 12px; font-size: 0.8rem;
+      }
+      .playlist-input input::placeholder { color: #666; }
+      .playlist-input button {
+        background: rgba(100,200,255,0.15); border: 1px solid rgba(100,200,255,0.3);
+        color: #eee; border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; cursor: pointer;
+      }
+      .playlist-input button:active { background: rgba(100,200,255,0.3); }
       .status-bar {
         text-align: center; font-size: 0.75rem; color: #666; margin-top: auto;
       }
@@ -147,6 +162,11 @@ function renderHomeHtml(state: EngineState): string {
 
     <div class="volume-row">
       <span class="vol-label" id="vol-label">-</span>
+    </div>
+
+    <div class="playlist-input">
+      <input id="playlist-url" type="url" placeholder="Spotify Playlist URL..." value="${escapeHtml(playlistUrl)}" />
+      <button id="btn-playlist">Laden</button>
     </div>
 
     <div class="status-bar">
@@ -200,6 +220,15 @@ function renderHomeHtml(state: EngineState): string {
       document.getElementById('btn-skip').onclick = function() { post('/skip'); };
       document.getElementById('btn-mute').onclick = function() { post('/toggle-mute'); };
       document.getElementById('btn-reload').onclick = function() { post('/reload'); };
+      document.getElementById('btn-playlist').onclick = function() {
+        var url = document.getElementById('playlist-url').value.trim();
+        if (!url) return;
+        fetch('/change-playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url })
+        }).then(function() { setTimeout(poll, 1000); });
+      };
 
       render(${JSON.stringify({ status, channelId: state.channelId, current: state.current, next: state.next, playback: state.playback })});
       setInterval(poll, 2000);
@@ -249,7 +278,7 @@ export function startHttpServer(
       }
 
       if (method === "GET" && pathname === "/") {
-        const html = renderHomeHtml(engine.getState());
+        const html = renderHomeHtml(engine.getState(), engine.getPlaylistUrl());
         writeContent(res, 200, "text/html; charset=utf-8", html);
         return;
       }
@@ -307,6 +336,26 @@ export function startHttpServer(
       if (method === "POST" && pathname === "/toggle-mute") {
         await engine.toggleMute();
         writeJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (method === "POST" && pathname === "/change-playlist") {
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk;
+        }
+        try {
+          const parsed = JSON.parse(body);
+          const url = typeof parsed.url === "string" ? parsed.url.trim() : "";
+          if (!url || !url.includes("spotify.com/playlist/")) {
+            writeJson(res, 400, { error: "Invalid Spotify playlist URL" });
+            return;
+          }
+          await engine.changePlaylist(url);
+          writeJson(res, 200, { ok: true, url });
+        } catch (error) {
+          writeJson(res, 500, { error: "Failed to change playlist" });
+        }
         return;
       }
 
