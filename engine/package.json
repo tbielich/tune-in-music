@@ -1,6 +1,6 @@
 {
   "name": "tune-in-music-engine",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Headless tune-in-music engine for mpv + yt-dlp",
   "main": "dist/index.js",
