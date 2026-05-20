@@ -108,6 +108,8 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         text-align: center; padding: 12px;
         background: rgba(255,255,255,0.05); border-radius: 12px;
       }
+      .now-playing .cover { width: 100%; max-width: 320px; border-radius: 8px; margin: 0 auto 8px; display: block; aspect-ratio: 16/9; object-fit: cover; }
+      .now-playing .cover[src=""] { display: none; }
       .now-playing .track { font-size: 1.2rem; font-weight: 600; margin: 4px 0; }
       .now-playing .meta { font-size: 0.8rem; color: #999; }
       .next { font-size: 0.85rem; color: #777; text-align: center; }
@@ -146,6 +148,7 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
   </head>
   <body>
     <div class="now-playing">
+      <img id="cover" class="cover" src="" alt="" />
       <div class="meta" id="meta"></div>
       <div class="track" id="track"></div>
     </div>
@@ -200,6 +203,16 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         var paused = s.playback && s.playback.paused === true;
         var muted = s.playback && s.playback.mute === true;
         var vol = (s.playback && typeof s.playback.volume === 'number') ? Math.round(s.playback.volume) : -1;
+
+        // Extract YouTube video ID for thumbnail
+        var input = (s.current && s.current.track && s.current.track.input) || '';
+        var vidMatch = input.match(/[?&]v=([A-Za-z0-9_-]+)/);
+        var coverEl = document.getElementById('cover');
+        if (vidMatch && vidMatch[1]) {
+          coverEl.src = 'https://img.youtube.com/vi/' + vidMatch[1] + '/mqdefault.jpg';
+        } else {
+          coverEl.src = '';
+        }
 
         document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
         document.getElementById('track').textContent = current;
