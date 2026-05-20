@@ -9,8 +9,22 @@ export class ChannelPlayer {
   }
 
   setTracks(tracks: TrackInput[]): void {
+    const currentId = this.tracks[this.cursor]?.id;
     this.tracks = tracks;
-    this.cursor = 0;
+
+    // Try to keep cursor at the same track
+    if (currentId) {
+      const idx = tracks.findIndex((t) => t.id === currentId);
+      if (idx >= 0) {
+        this.cursor = idx;
+        return;
+      }
+    }
+
+    // Only reset if current track not found in new list
+    if (this.cursor >= this.tracks.length) {
+      this.cursor = 0;
+    }
   }
 
   getTrackCount(): number {
