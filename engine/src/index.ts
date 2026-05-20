@@ -10,6 +10,7 @@ import { MpvIpc } from "./mpvIpc";
 import { resolveSpotifyPlaylist, type SpotifyResolveOptions } from "./spotify";
 import { StateStore, createInitialState, setState } from "./state";
 import type { EngineState, NowPlaying, PlaybackState, ResolvedStream } from "./types";
+import { VideoCache } from "./videoCache";
 import { resolveStreamUrl } from "./ytdlp";
 
 interface EngineConfig {
@@ -24,6 +25,8 @@ interface EngineConfig {
   spotifyPlaylistUrl: string;
   spotifyRefreshMinutes: number;
   noiseVideoPath: string;
+  cacheDir: string;
+  cacheMaxSizeBytes: number;
 }
 
 function nowIso(): string {
@@ -81,6 +84,20 @@ function parsePort(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function parseSizeBytes(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const trimmed = value.trim().toLowerCase();
+  const match = trimmed.match(/^(\d+)\s*(gb|mb|kb|b)?$/);
+  if (!match) return fallback;
+  const num = Number.parseInt(match[1] ?? "0", 10);
+  if (Number.isNaN(num) || num <= 0) return fallback;
+  const unit = match[2] ?? "b";
+  if (unit === "gb") return num * 1024 * 1024 * 1024;
+  if (unit === "mb") return num * 1024 * 1024;
+  if (unit === "kb") return num * 1024;
+  return num;
+}
+
 function parseEnabledFlag(value: string | undefined, fallback = false): boolean {
   if (!value) {
     return fallback;
@@ -110,6 +127,8 @@ function readConfig(): EngineConfig {
     spotifyPlaylistUrl: process.env.SPOTIFY_PLAYLIST_URL ?? "",
     spotifyRefreshMinutes: parsePort(process.env.SPOTIFY_REFRESH_MINUTES, 15),
     noiseVideoPath: process.env.NOISE_VIDEO_PATH ?? path.resolve(process.cwd(), "static-noise.mp4"),
+    cacheDir: process.env.CACHE_DIR ?? path.resolve(process.cwd(), "cache"),
+    cacheMaxSizeBytes: parseSizeBytes(process.env.CACHE_MAX_SIZE, 20 * 1024 * 1024 * 1024),
   };
 }
 
@@ -117,6 +136,7 @@ class Engine {
   private readonly stateStore: StateStore;
   private readonly channelPlayer: ChannelPlayer;
   private readonly mpv: MpvIpc;
+  private readonly videoCache: VideoCache;
   private pollTimer?: NodeJS.Timeout;
   private pollBusy = false;
   private reloadPromise?: Promise<void>;
@@ -128,6 +148,12 @@ class Engine {
     this.stateStore = new StateStore(createInitialState(config.channelId));
     this.channelPlayer = new ChannelPlayer(channels[config.channelId]);
     this.mpv = new MpvIpc(config.mpvSocket);
+    this.videoCache = new VideoCache({
+      cacheDir: config.cacheDir,
+      maxSizeBytes: config.cacheMaxSizeBytes,
+      ytdlpBin: config.ytdlpBin,
+      format: config.format,
+    });
   }
 
   getState(): EngineState {
@@ -397,6 +423,27 @@ class Engine {
       input: track.input,
     });
 
+    // Try local cache first
+    const cached = this.videoCache.get(track.id);
+    if (cached) {
+      logger.info("resolve_from_cache", { slot, trackId: track.id });
+      return { url: cached };
+    }
+
+    // Try downloading to cache
+    try {
+      const localPath = await this.videoCache.download(track.id, track.input);
+      logger.info("resolve_downloaded", { slot, trackId: track.id });
+      return { url: localPath };
+    } catch (error) {
+      logger.warn("cache_download_fallback_to_stream", {
+        slot,
+        trackId: track.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Fallback: resolve stream URL (no cache)
     const resolved = await resolveStreamUrl(track.input, {
       ytdlpBin: this.config.ytdlpBin,
       format: this.config.format,
@@ -580,6 +627,9 @@ class Engine {
     );
 
     this.channelPlayer.setTracks(tracks);
+
+    // Start background download of all tracks
+    this.videoCache.downloadInBackground(tracks);
   }
 
   private async refreshSpotifyTracks(): Promise<void> {
