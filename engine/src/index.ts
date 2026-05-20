@@ -229,6 +229,11 @@ class Engine {
     await this.refreshPlaybackState();
   }
 
+  async setVolume(vol: number): Promise<void> {
+    await this.mpv.setProperty("volume", vol);
+    await this.refreshPlaybackState();
+  }
+
   async toggleMute(): Promise<void> {
     await this.mpv.toggleMute();
     await this.refreshPlaybackState();
@@ -767,6 +772,7 @@ async function main(): Promise<void> {
       togglePause: () => engine.togglePause(),
       volumeUp: () => engine.volumeUp(),
       volumeDown: () => engine.volumeDown(),
+      setVolume: (vol: number) => engine.setVolume(vol),
       toggleMute: () => engine.toggleMute(),
       changePlaylist: (url: string) => engine.changePlaylist(url),
       getPlaylistUrl: () => engine.getPlaylistUrl(),

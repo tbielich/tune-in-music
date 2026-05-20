@@ -12,6 +12,7 @@ export interface HttpEngineController {
   togglePause: () => Promise<void>;
   volumeUp: () => Promise<void>;
   volumeDown: () => Promise<void>;
+  setVolume: (vol: number) => Promise<void>;
   toggleMute: () => Promise<void>;
   changePlaylist: (url: string) => Promise<void>;
   getPlaylistUrl: () => string;
@@ -79,15 +80,11 @@ function writeContent(
 }
 
 function renderHomeHtml(state: EngineState, playlistUrl: string): string {
-  const current = state.current?.track.label ?? "-";
-  const next = state.next?.track.label ?? "-";
   const status = state.status;
-  const paused = state.playback?.paused === true;
-  const muted = state.playback?.mute === true;
   const volume =
     typeof state.playback?.volume === "number" && Number.isFinite(state.playback.volume)
       ? Math.round(state.playback.volume)
-      : -1;
+      : 50;
   const playlistId = playlistUrl.match(/\/playlist\/([A-Za-z0-9]+)/)?.[1] ?? "";
 
   return `<!doctype html>
@@ -95,96 +92,153 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>tune-in-music remote</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>tune-in-music</title>
     <style>
+      :root {
+        --bg: #0f0f1a;
+        --surface: rgba(255,255,255,0.04);
+        --surface-hover: rgba(255,255,255,0.08);
+        --border: rgba(255,255,255,0.1);
+        --text: #f0f0f0;
+        --text-subtle: #888;
+        --text-dim: #555;
+        --accent: #64c8ff;
+        --accent-bg: rgba(100,200,255,0.12);
+        --radius: 12px;
+        --radius-sm: 8px;
+      }
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #1a1a2e; color: #eee;
+        background: var(--bg); color: var(--text);
         min-height: 100dvh; padding: 16px;
-        display: flex; flex-direction: column; gap: 16px;
+        display: flex; flex-direction: column; gap: 14px;
+        max-width: 420px; margin: 0 auto;
       }
+
+      /* Now Playing Card — Common Region (Gestalt #6) */
       .now-playing {
-        text-align: center; padding: 12px;
-        background: rgba(255,255,255,0.05); border-radius: 12px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 14px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
       }
-      .now-playing .cover { width: 100%; max-width: 320px; border-radius: 8px; margin: 0 auto 8px; display: block; aspect-ratio: 16/9; object-fit: cover; }
-      .now-playing .cover[src=""] { display: none; }
-      .now-playing .track { font-size: 1.2rem; font-weight: 600; margin: 4px 0; }
-      .now-playing .meta { font-size: 0.8rem; color: #999; }
-      .next { font-size: 0.85rem; color: #777; text-align: center; }
+      .cover {
+        width: 100%; border-radius: var(--radius-sm);
+        aspect-ratio: 16/9; object-fit: cover; display: block;
+      }
+      .cover[src=""] { display: none; }
+      .track-info { text-align: center; }
+      .track-info .title { font-size: 1.1rem; font-weight: 600; line-height: 1.3; }
+      .track-info .next { font-size: 0.8rem; color: var(--text-subtle); margin-top: 4px; }
+      .track-info .meta { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+
+      /* Controls — Proximity (Gestalt #1): grouped tightly */
       .controls {
-        display: grid; grid-template-columns: 1fr 1fr 1fr;
-        gap: 10px; max-width: 400px; margin: 0 auto; width: 100%;
+        display: flex; justify-content: center; align-items: center; gap: 12px;
       }
       .controls button {
-        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-        color: #eee; border-radius: 12px; padding: 16px 8px;
-        font-size: 1.4rem; cursor: pointer; transition: background 0.15s;
+        width: 56px; height: 56px;
+        background: var(--surface); border: 1px solid var(--border);
+        color: var(--text); border-radius: 50%;
+        font-size: 1.3rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.12s, transform 0.1s;
         -webkit-tap-highlight-color: transparent;
       }
-      .controls button:active { background: rgba(255,255,255,0.25); }
-      .controls button.active { background: rgba(100,200,255,0.2); border-color: rgba(100,200,255,0.4); }
-      .volume-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
-      .volume-row .vol-label { font-size: 0.9rem; min-width: 40px; text-align: center; }
-      .playlist-input {
-        display: flex; gap: 8px; max-width: 400px; margin: 0 auto; width: 100%;
+      .controls button:active { background: var(--surface-hover); transform: scale(0.92); }
+      .controls button.primary {
+        width: 64px; height: 64px; font-size: 1.5rem;
+        background: var(--accent-bg); border-color: var(--accent);
       }
-      .playlist-input input {
-        flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-        color: #eee; border-radius: 8px; padding: 10px 12px; font-size: 0.8rem;
+      .controls button.active { background: var(--accent-bg); border-color: var(--accent); }
+
+      /* Volume Slider — Continuity (Gestalt #4): horizontal flow */
+      .volume-section {
+        display: flex; align-items: center; gap: 10px; padding: 0 4px;
       }
-      .playlist-input input::placeholder { color: #666; }
-      .playlist-input button {
-        background: rgba(100,200,255,0.15); border: 1px solid rgba(100,200,255,0.3);
-        color: #eee; border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; cursor: pointer;
+      .volume-section .vol-icon { font-size: 1rem; cursor: pointer; padding: 4px; }
+      .volume-section input[type=range] {
+        flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+        background: var(--border); border-radius: 2px; outline: none;
       }
-      .playlist-input button:active { background: rgba(100,200,255,0.3); }
-      .status-bar {
-        text-align: center; font-size: 0.75rem; color: #666; margin-top: auto;
+      .volume-section input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 20px; height: 20px;
+        background: var(--accent); border-radius: 50%; cursor: pointer;
       }
-      .status-bar a { color: #888; }
+      .volume-section .vol-value {
+        font-size: 0.75rem; color: var(--text-subtle); min-width: 32px; text-align: right;
+      }
+
+      /* Playlist Input — Common Region (Gestalt #6) */
+      .playlist-section {
+        display: flex; gap: 8px;
+      }
+      .playlist-section input {
+        flex: 1; background: var(--surface); border: 1px solid var(--border);
+        color: var(--text); border-radius: var(--radius-sm);
+        padding: 10px 12px; font-size: 0.8rem; outline: none;
+      }
+      .playlist-section input:focus { border-color: var(--accent); }
+      .playlist-section input::placeholder { color: var(--text-dim); }
+      .playlist-section button {
+        background: var(--accent-bg); border: 1px solid var(--accent);
+        color: var(--accent); border-radius: var(--radius-sm);
+        padding: 10px 14px; font-size: 0.8rem; font-weight: 500; cursor: pointer;
+      }
+      .playlist-section button:active { background: rgba(100,200,255,0.25); }
+
+      /* Footer */
+      .footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); margin-top: auto; }
+      .footer a { color: var(--text-subtle); text-decoration: none; }
     </style>
   </head>
   <body>
+
     <div class="now-playing">
       <img id="cover" class="cover" src="" alt="" />
-      <div class="meta" id="meta"></div>
-      <div class="track" id="track"></div>
+      <div class="track-info">
+        <div class="title" id="track">-</div>
+        <div class="next" id="next">-</div>
+        <div class="meta" id="meta">-</div>
+      </div>
     </div>
-    <div class="next" id="next"></div>
 
     <div class="controls">
-      <button id="btn-vol-down" aria-label="Volume down">🔉</button>
-      <button id="btn-pause" aria-label="Play/Pause">⏸️</button>
-      <button id="btn-vol-up" aria-label="Volume up">🔊</button>
-
-      <button id="btn-skip" aria-label="Skip">⏭️</button>
-      <button id="btn-mute" aria-label="Mute">🔈</button>
       <button id="btn-reload" aria-label="Reload">🔄</button>
+      <button id="btn-pause" class="primary" aria-label="Play/Pause">⏸️</button>
+      <button id="btn-skip" aria-label="Skip">⏭️</button>
     </div>
 
-    <div class="volume-row">
-      <span class="vol-label" id="vol-label">-</span>
+    <div class="volume-section">
+      <span class="vol-icon" id="btn-mute">🔊</span>
+      <input type="range" id="vol-slider" min="0" max="100" value="${volume}" />
+      <span class="vol-value" id="vol-label">${volume}%</span>
     </div>
 
-    <div class="playlist-input">
-      <input id="playlist-url" type="text" placeholder="Playlist-ID eingeben..." value="${escapeHtml(playlistId)}" />
+    <div class="playlist-section">
+      <input id="playlist-url" type="text" placeholder="Spotify Playlist-ID" value="${escapeHtml(playlistId)}" />
       <button id="btn-playlist">Laden</button>
     </div>
 
-    <div class="status-bar">
-      <a href="/ui">VHS UI</a> &middot; <a href="/state">JSON</a>
+    <div class="footer">
+      <a href="/state">API</a> &middot; <a href="/health">Health</a>
     </div>
 
     <script>
     (function() {
       var busy = false;
+      var volTimeout = null;
 
-      function post(path) {
+      function post(path, body) {
         if (busy) return;
         busy = true;
-        fetch(path, { method: 'POST' })
+        var opts = { method: 'POST' };
+        if (body) {
+          opts.headers = { 'Content-Type': 'application/json' };
+          opts.body = JSON.stringify(body);
+        }
+        fetch(path, opts)
           .then(function() { setTimeout(poll, 400); })
           .catch(function() {})
           .finally(function() { busy = false; });
@@ -204,45 +258,55 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         var muted = s.playback && s.playback.mute === true;
         var vol = (s.playback && typeof s.playback.volume === 'number') ? Math.round(s.playback.volume) : -1;
 
-        // Extract YouTube video ID for thumbnail
         var input = (s.current && s.current.track && s.current.track.input) || '';
         var vidMatch = input.match(/[?&]v=([A-Za-z0-9_-]+)/);
         var coverEl = document.getElementById('cover');
         if (vidMatch && vidMatch[1]) {
-          coverEl.src = 'https://img.youtube.com/vi/' + vidMatch[1] + '/mqdefault.jpg';
+          var newSrc = 'https://img.youtube.com/vi/' + vidMatch[1] + '/mqdefault.jpg';
+          if (coverEl.src !== newSrc) coverEl.src = newSrc;
         } else {
           coverEl.src = '';
         }
 
-        document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
         document.getElementById('track').textContent = current;
         document.getElementById('next').textContent = 'Next: ' + next;
-        document.getElementById('vol-label').textContent = vol >= 0 ? vol + '%' : '-';
+        document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
 
         var pauseBtn = document.getElementById('btn-pause');
         pauseBtn.textContent = paused ? '\\u25b6\\ufe0f' : '\\u23f8\\ufe0f';
-        pauseBtn.className = paused ? 'active' : '';
+        pauseBtn.className = paused ? 'primary active' : 'primary';
 
-        var muteBtn = document.getElementById('btn-mute');
-        muteBtn.textContent = muted ? '\\ud83d\\udd07' : '\\ud83d\\udd08';
-        muteBtn.className = muted ? 'active' : '';
+        var muteIcon = document.getElementById('btn-mute');
+        muteIcon.textContent = muted ? '\\ud83d\\udd07' : '\\ud83d\\udd0a';
+
+        if (vol >= 0) {
+          document.getElementById('vol-slider').value = vol;
+          document.getElementById('vol-label').textContent = vol + '%';
+        }
       }
 
-      document.getElementById('btn-vol-down').onclick = function() { post('/vol-down'); };
-      document.getElementById('btn-vol-up').onclick = function() { post('/vol-up'); };
       document.getElementById('btn-pause').onclick = function() { post('/toggle-pause'); };
       document.getElementById('btn-skip').onclick = function() { post('/skip'); };
-      document.getElementById('btn-mute').onclick = function() { post('/toggle-mute'); };
       document.getElementById('btn-reload').onclick = function() { post('/reload'); };
+      document.getElementById('btn-mute').onclick = function() { post('/toggle-mute'); };
+
+      document.getElementById('vol-slider').oninput = function() {
+        var val = this.value;
+        document.getElementById('vol-label').textContent = val + '%';
+        clearTimeout(volTimeout);
+        volTimeout = setTimeout(function() {
+          fetch('/set-volume', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ volume: Number(val) })
+          });
+        }, 150);
+      };
+
       document.getElementById('btn-playlist').onclick = function() {
         var id = document.getElementById('playlist-url').value.trim();
         if (!id) return;
-        var url = 'https://open.spotify.com/playlist/' + id;
-        fetch('/change-playlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        }).then(function() { setTimeout(poll, 1000); });
+        post('/change-playlist', { url: 'https://open.spotify.com/playlist/' + id });
       };
 
       render(${JSON.stringify({ status, channelId: state.channelId, current: state.current, next: state.next, playback: state.playback })});
@@ -345,6 +409,26 @@ export function startHttpServer(
       if (method === "POST" && pathname === "/vol-down") {
         await engine.volumeDown();
         writeJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (method === "POST" && pathname === "/set-volume") {
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk;
+        }
+        try {
+          const parsed = JSON.parse(body);
+          const vol = typeof parsed.volume === "number" ? parsed.volume : -1;
+          if (vol < 0 || vol > 150) {
+            writeJson(res, 400, { error: "Invalid volume" });
+            return;
+          }
+          await engine.setVolume(vol);
+          writeJson(res, 200, { ok: true });
+        } catch {
+          writeJson(res, 400, { error: "Invalid request" });
+        }
         return;
       }
 
