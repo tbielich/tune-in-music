@@ -250,7 +250,10 @@ class Engine {
     logger.info("reload_start", { reason });
 
     try {
-      this.channelPlayer.reset();
+      // Only reset cursor on explicit manual/startup reload
+      if (reason === "startup" || reason === "manual") {
+        this.channelPlayer.reset();
+      }
 
       const currentTrack = this.channelPlayer.getCurrentTrack();
       if (!currentTrack) {
