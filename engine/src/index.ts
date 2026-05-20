@@ -636,29 +636,50 @@ class Engine {
 
     logger.info("spotify_playlist_fetched", { trackCount: queries.length });
 
-    // Step 2: Resolve just the first 2 tracks to start playback immediately
+    // Step 2: Build track list from cache first (instant), then fill gaps
     const options: SpotifyResolveOptions = {
       ytdlpBin: this.config.ytdlpBin,
       timeoutMs: 20_000,
     };
 
-    const initialTracks: TrackInput[] = [];
-    for (const query of queries.slice(0, 2)) {
-      try {
-        const url = await searchYouTubeUrl(query, options);
-        const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-        initialTracks.push({ id, label: query, input: url });
-      } catch {
-        // skip failed
+    const allTracks: TrackInput[] = [];
+    const needsResolve: string[] = [];
+
+    for (const query of queries) {
+      const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      if (this.videoCache.has(id)) {
+        // Already cached — use a placeholder URL, resolveTrack will find it in cache
+        allTracks.push({ id, label: query, input: `cached://${id}` });
+      } else {
+        needsResolve.push(query);
       }
     }
 
-    if (initialTracks.length > 0) {
-      this.channelPlayer.setTracks(initialTracks);
+    // If we have cached tracks, start playback immediately
+    if (allTracks.length > 0) {
+      this.channelPlayer.setTracks(allTracks);
+      logger.info("spotify_loaded_from_cache", { cached: allTracks.length, needsResolve: needsResolve.length });
+    } else {
+      // No cache — resolve first 2 tracks to start quickly
+      for (const query of queries.slice(0, 2)) {
+        try {
+          const url = await searchYouTubeUrl(query, options);
+          const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+          allTracks.push({ id, label: query, input: url });
+        } catch {
+          // skip
+        }
+      }
+      if (allTracks.length > 0) {
+        this.channelPlayer.setTracks(allTracks);
+      }
+      needsResolve.push(...queries.slice(2).filter((q) => !needsResolve.includes(q)));
     }
 
-    // Step 3: Resolve remaining tracks in background, then update playlist
-    void this.resolveRemainingSpotifyTracks(queries, options, initialTracks);
+    // Step 3: Resolve remaining in background
+    if (needsResolve.length > 0) {
+      void this.resolveRemainingSpotifyTracks(queries, options, allTracks);
+    }
   }
 
   private async resolveRemainingSpotifyTracks(
