@@ -659,8 +659,9 @@ class Engine {
     for (const query of queries) {
       const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
       if (this.videoCache.has(id)) {
-        // Already cached — use a placeholder URL, resolveTrack will find it in cache
-        allTracks.push({ id, label: query, input: `cached://${id}` });
+        // Already cached — use stored YouTube URL for metadata
+        const ytUrl = this.videoCache.getYoutubeUrl(id) ?? `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        allTracks.push({ id, label: query, input: ytUrl });
       } else {
         needsResolve.push(query);
       }

@@ -17,6 +17,7 @@ interface CacheEntry {
   sizeBytes: number;
   lastPlayedAt: number;
   downloadedAt: number;
+  youtubeUrl?: string;
 }
 
 const METADATA_FILE = "cache-meta.json";
@@ -69,6 +70,13 @@ export class VideoCache {
   }
 
   /**
+   * Get the stored YouTube URL for a cached track.
+   */
+  getYoutubeUrl(trackId: string): string | undefined {
+    return this.entries.get(trackId)?.youtubeUrl;
+  }
+
+  /**
    * Download a video to cache. Returns the local file path.
    */
   async download(trackId: string, youtubeUrl: string): Promise<string> {
@@ -94,6 +102,7 @@ export class VideoCache {
         sizeBytes: stat.size,
         lastPlayedAt: Date.now(),
         downloadedAt: Date.now(),
+        youtubeUrl,
       };
 
       this.entries.set(trackId, entry);
