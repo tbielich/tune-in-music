@@ -149,17 +149,23 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
       .controls button:active { background: var(--surface-hover); transform: scale(0.92); }
       .controls button.primary {
         width: 64px; height: 64px; font-size: 1.5rem;
-        background: var(--accent-bg); border-color: transparent;
-        position: relative;
+        background: var(--accent-bg); border: none;
+        position: relative; z-index: 0;
       }
       .controls button.primary::before {
         content: ''; position: absolute; inset: -3px;
         border-radius: 50%;
-        background: conic-gradient(var(--accent) var(--progress, 0%), transparent var(--progress, 0%));
+        background: conic-gradient(var(--accent) var(--progress, 0%), var(--border) var(--progress, 0%));
+        z-index: -2;
+      }
+      .controls button.primary::after {
+        content: ''; position: absolute; inset: 0;
+        border-radius: 50%;
+        background: var(--bg);
         z-index: -1;
       }
       .controls button.primary.loading::before {
-        background: conic-gradient(#fff 25%, transparent 25%);
+        background: conic-gradient(#fff 25%, var(--border) 25%);
         animation: spin 1s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
