@@ -149,8 +149,20 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
       .controls button:active { background: var(--surface-hover); transform: scale(0.92); }
       .controls button.primary {
         width: 64px; height: 64px; font-size: 1.5rem;
-        background: var(--accent-bg); border-color: var(--accent);
+        background: var(--accent-bg); border-color: transparent;
+        position: relative;
       }
+      .controls button.primary::before {
+        content: ''; position: absolute; inset: -3px;
+        border-radius: 50%;
+        background: conic-gradient(var(--accent) var(--progress, 0%), transparent var(--progress, 0%));
+        z-index: -1;
+      }
+      .controls button.primary.loading::before {
+        background: conic-gradient(#fff 25%, transparent 25%);
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
       .controls button.active { background: var(--accent-bg); border-color: var(--accent); }
 
       /* Volume Slider — Continuity (Gestalt #4): horizontal flow */
@@ -274,7 +286,14 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
 
         var pauseBtn = document.getElementById('btn-pause');
         pauseBtn.textContent = paused ? '\\u25b6' : '\\u23f8';
-        pauseBtn.className = paused ? 'primary active' : 'primary';
+
+        var isLoading = s.status === 'RESOLVING_CURRENT' || s.status === 'RESOLVING_NEXT' || s.status === 'IDLE';
+        var progress = 0;
+        if (s.playback && s.playback.duration > 0 && s.playback.position >= 0) {
+          progress = Math.min(100, (s.playback.position / s.playback.duration) * 100);
+        }
+        pauseBtn.className = 'primary' + (paused ? ' active' : '') + (isLoading ? ' loading' : '');
+        pauseBtn.style.setProperty('--progress', progress + '%');
 
         var muteIcon = document.getElementById('btn-mute');
         muteIcon.textContent = muted ? '\\u2715' : '\\u266b';

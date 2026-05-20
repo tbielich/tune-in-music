@@ -22,6 +22,8 @@ export interface PlaybackState {
   volume?: number;
   mute?: boolean;
   buffering?: boolean;
+  duration?: number;
+  position?: number;
 }
 
 export interface EngineState {

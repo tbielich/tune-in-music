@@ -528,10 +528,12 @@ class Engine {
 
   private async refreshPlaybackState(): Promise<void> {
     try {
-      const [pausedRaw, volumeRaw, muteRaw] = await Promise.all([
+      const [pausedRaw, volumeRaw, muteRaw, durationRaw, positionRaw] = await Promise.all([
         this.mpv.getProperty<unknown>("pause"),
         this.mpv.getProperty<unknown>("volume"),
         this.mpv.getProperty<unknown>("mute"),
+        this.mpv.getProperty<unknown>("duration").catch(() => undefined),
+        this.mpv.getProperty<unknown>("time-pos").catch(() => undefined),
       ]);
 
       const playback: PlaybackState = {};
@@ -549,6 +551,16 @@ class Engine {
 
       if (typeof muteRaw === "boolean") {
         playback.mute = muteRaw;
+        hasPlaybackValue = true;
+      }
+
+      if (typeof durationRaw === "number" && Number.isFinite(durationRaw)) {
+        playback.duration = durationRaw;
+        hasPlaybackValue = true;
+      }
+
+      if (typeof positionRaw === "number" && Number.isFinite(positionRaw)) {
+        playback.position = positionRaw;
         hasPlaybackValue = true;
       }
 
