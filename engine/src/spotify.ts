@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 
 import { logger } from "./logger";
 import type { TrackInput } from "./channels";
+import { slugify } from "./utils";
 
 export interface SpotifyResolveOptions {
   ytdlpBin: string;
@@ -227,14 +228,6 @@ export function searchYouTubeUrl(
       }
     });
   });
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
 }
 
 export async function resolveSpotifyPlaylist(

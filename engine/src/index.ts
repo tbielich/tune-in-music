@@ -10,6 +10,7 @@ import { MpvIpc } from "./mpvIpc";
 import { type SpotifyResolveOptions } from "./spotify";
 import { StateStore, createInitialState, setState } from "./state";
 import type { EngineState, NowPlaying, PlaybackState, ResolvedStream } from "./types";
+import { nowIso, slugify, toError } from "./utils";
 import { VideoCache } from "./videoCache";
 import { resolveStreamUrl } from "./ytdlp";
 
@@ -27,17 +28,6 @@ interface EngineConfig {
   noiseVideoPath: string;
   cacheDir: string;
   cacheMaxSizeBytes: number;
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  return new Error(String(error));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -674,7 +664,7 @@ class Engine {
     const needsResolve: string[] = [];
 
     for (const query of queries) {
-      const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      const id = slugify(query);
       if (this.videoCache.has(id)) {
         // Already cached — use stored YouTube URL for metadata
         const ytUrl = this.videoCache.getYoutubeUrl(id) ?? `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
@@ -693,7 +683,7 @@ class Engine {
       for (const query of queries.slice(0, 2)) {
         try {
           const url = await searchYouTubeUrl(query, options);
-          const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+          const id = slugify(query);
           allTracks.push({ id, label: query, input: url });
         } catch {
           // skip
@@ -723,7 +713,7 @@ class Engine {
     for (const query of queries.slice(2)) {
       try {
         const url = await searchYouTubeUrl(query, options);
-        const id = query.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+        const id = slugify(query);
         if (!resolvedIds.has(id)) {
           allTracks.push({ id, label: query, input: url });
           resolvedIds.add(id);

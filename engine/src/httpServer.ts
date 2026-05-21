@@ -478,7 +478,8 @@ export function startHttpServer(
           await engine.changePlaylist(url);
           writeJson(res, 200, { ok: true, url });
         } catch (error) {
-          writeJson(res, 500, { error: "Failed to change playlist" });
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          writeJson(res, 500, { error: `Failed to change playlist: ${msg}` });
         }
         return;
       }

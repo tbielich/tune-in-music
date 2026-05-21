@@ -2,6 +2,8 @@ import fs from "node:fs";
 import net from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { toError } from "./utils";
+
 interface MpvResponse {
   request_id?: number;
   error?: string;
@@ -15,13 +17,6 @@ interface PendingRequest {
 }
 
 type PlaylistAdvanceMode = "force" | "weak";
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  return new Error(String(error));
-}
 
 export class MpvIpc {
   private socket?: net.Socket;

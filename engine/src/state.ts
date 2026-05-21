@@ -1,9 +1,6 @@
 import type { ChannelId } from "./channels";
 import type { EngineState } from "./types";
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
+import { nowIso } from "./utils";
 
 export function createInitialState(channelId: ChannelId): EngineState {
   return {

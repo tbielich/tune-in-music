@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 import type { ResolvedStream } from "./types";
+import { toError } from "./utils";
 
 export interface ResolveOptions {
   ytdlpBin: string;
@@ -11,13 +12,6 @@ export interface ResolveOptions {
 interface ResolveAttempt {
   format: string;
   extractorArgs?: string;
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  return new Error(String(error));
 }
 
 export function resolveStreamUrl(

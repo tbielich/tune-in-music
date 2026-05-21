@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { logger } from "./logger";
+import { toError } from "./utils";
 
 const DEV_INPUT_DIR = "/dev/input";
 const SYS_CLASS_INPUT_DIR = "/sys/class/input";
@@ -59,13 +60,6 @@ interface InputEvent {
   type: number;
   code: number;
   value: number;
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  return new Error(String(error));
 }
 
 function toBoolString(value: boolean): string {
