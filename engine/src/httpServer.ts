@@ -238,8 +238,8 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
 
     <div class="controls">
       <button id="btn-reload" aria-label="Reload">&#x21bb;</button>
-      <button id="btn-pause" class="primary" aria-label="Play/Pause">&#x23f8;</button>
-      <button id="btn-skip" aria-label="Skip">&#x23ed;</button>
+      <button id="btn-pause" class="primary" aria-label="Play/Pause">&#x2016;</button>
+      <button id="btn-skip" aria-label="Skip">&#x23e9;</button>
     </div>
 
     <div class="volume-section">
@@ -311,7 +311,7 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         document.getElementById('meta').textContent = s.channelId + ' \\u00b7 ' + s.status;
 
         var pauseBtn = document.getElementById('btn-pause');
-        pauseBtn.textContent = paused ? '\\u25b6' : '\\u23f8';
+        pauseBtn.textContent = paused ? '\\u25b6' : '\\u2016';
 
         var isLoading = s.status === 'RESOLVING_CURRENT' || s.status === 'RESOLVING_NEXT' || s.status === 'IDLE';
         var progress = 0;
