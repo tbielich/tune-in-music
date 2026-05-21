@@ -278,6 +278,9 @@ class Engine {
       const currentResolved = await this.resolveTrack(currentTrack, "current");
       await this.mpv.setProperty("loop-file", "no");
       await this.mpv.loadReplace(currentResolved.url);
+      // Workaround: mpv 0.35 DRM mode doesn't auto-play after loadfile
+      await sleep(500);
+      await this.mpv.setProperty("playlist-pos", 0);
 
       setState(this.stateStore, {
         status: "PLAYING",
