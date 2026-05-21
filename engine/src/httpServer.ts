@@ -206,6 +206,20 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
       }
       .playlist-section button:active { background: rgba(100,200,255,0.25); }
 
+      /* Presets — Proximity (Gestalt #1) */
+      .presets {
+        display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+      }
+      .presets .preset {
+        background: var(--surface); border: 1px solid var(--border);
+        color: var(--text-subtle); border-radius: 16px;
+        padding: 6px 14px; font-size: 0.75rem; cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .presets .preset:active { background: var(--surface-hover); }
+      .presets .preset.active { border-color: var(--accent); color: var(--accent); }
+
       /* Footer */
       .footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); margin-top: auto; }
       .footer a { color: var(--text-subtle); text-decoration: none; }
@@ -237,6 +251,12 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
     <div class="playlist-section">
       <input id="playlist-url" type="text" placeholder="Spotify Playlist-ID" value="${escapeHtml(playlistId)}" />
       <button id="btn-playlist">Laden</button>
+    </div>
+
+    <div class="presets">
+      <button class="preset" data-id="1o6pxgjA5affQmUdRSIVuh">TUI Mix</button>
+      <button class="preset" data-id="37i9dQZF1DXb57FjYWz00c">80s Hits</button>
+      <button class="preset" data-id="5X9rtYxwwCOTpgQprZnZT4">MTV 90s</button>
     </div>
 
     <div class="footer">
@@ -333,6 +353,14 @@ function renderHomeHtml(state: EngineState, playlistUrl: string): string {
         if (!id) return;
         post('/change-playlist', { url: 'https://open.spotify.com/playlist/' + id });
       };
+
+      document.querySelectorAll('.preset').forEach(function(btn) {
+        btn.onclick = function() {
+          var id = btn.dataset.id;
+          document.getElementById('playlist-url').value = id;
+          post('/change-playlist', { url: 'https://open.spotify.com/playlist/' + id });
+        };
+      });
 
       render(${JSON.stringify({ status, channelId: state.channelId, current: state.current, next: state.next, playback: state.playback })});
       setInterval(poll, 2000);
