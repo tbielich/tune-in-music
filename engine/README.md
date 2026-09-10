@@ -61,7 +61,9 @@ Important vars:
 - `HOST` (default `0.0.0.0`)
 - `PORT` (default `3030`)
 - `TV_CHANNEL` (default `overallTop10`)
-- `TV_FORMAT` (default `best[height<=480]`)
+- `TV_FORMAT` (default prefers H.264/avc1 so the Raspberry Pi 4 can hardware-decode:
+  `bestvideo[vcodec^=avc1][height<=720]+bestaudio/best[vcodec^=avc1][height<=720]/best[ext=mp4]/best`.
+  AV1/VP9 have no HW decoder on the Pi 4 and play audio-only / black video.)
 - `MPV_SOCKET` (default `/tmp/mpv.sock`)
 - `YTDLP_BIN` (default `yt-dlp`)
 - `MPV_BIN` (default `mpv`)

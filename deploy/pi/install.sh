@@ -51,7 +51,7 @@ if [[ ! -f "$ENGINE_ENV_FILE" ]]; then
 HOST=0.0.0.0
 PORT=3030
 TV_CHANNEL=overallTop10
-TV_FORMAT=best[height<=480]
+TV_FORMAT=bestvideo[vcodec^=avc1][height<=720]+bestaudio/best[vcodec^=avc1][height<=720]/best[ext=mp4]/best
 MPV_SOCKET=/tmp/mpv.sock
 YTDLP_BIN=yt-dlp
 MPV_BIN=mpv
