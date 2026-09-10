@@ -45,9 +45,14 @@ async function resolveWithAttempts(
 }
 
 function buildAttempts(format: string): ResolveAttempt[] {
+  // Prefer H.264 (avc1) fallbacks before the unconstrained "b" so the Pi 4 keeps
+  // a hardware-decodable stream even when the primary format fails.
+  const avc1Fallback = "best[vcodec^=avc1]/b[ext=mp4]/b";
   const rawAttempts: ResolveAttempt[] = [
     { format },
     { format, extractorArgs: "youtube:player_client=android" },
+    { format: avc1Fallback },
+    { format: avc1Fallback, extractorArgs: "youtube:player_client=android" },
     { format: "b" },
     { format: "b", extractorArgs: "youtube:player_client=android" },
   ];

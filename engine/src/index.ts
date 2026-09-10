@@ -109,7 +109,11 @@ function readConfig(): EngineConfig {
     host: process.env.HOST ?? "0.0.0.0",
     port: parsePort(process.env.PORT, 3030),
     channelId,
-    format: process.env.TV_FORMAT ?? "best[height<=480]",
+    // Prefer H.264 (avc1) which the Raspberry Pi 4 can hardware-decode; AV1/VP9
+    // have no HW decoder on the Pi 4 and fail to play (audio only / black video).
+    format:
+      process.env.TV_FORMAT ??
+      "bestvideo[vcodec^=avc1][height<=720]+bestaudio/best[vcodec^=avc1][height<=720]/best[ext=mp4]/best",
     mpvSocket: process.env.MPV_SOCKET ?? "/tmp/mpv.sock",
     ytdlpBin: process.env.YTDLP_BIN ?? "yt-dlp",
     mpvBin: process.env.MPV_BIN ?? "mpv",
